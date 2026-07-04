@@ -30,6 +30,47 @@ body {
 
 #root { display: flex; min-height: 100vh; }
 
+/* --- Üst çubuk + hamburger (yalnız dar ekranda görünür) --- */
+.topbar {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 52px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  background: var(--page);
+  border-bottom: 1px solid var(--border);
+  z-index: 20;
+}
+.topbar .brand { font-size: 16px; font-weight: 650; letter-spacing: 0.2px; }
+.topbar .brand span { color: var(--series-1); }
+.hamburger {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 38px;
+  height: 38px;
+  padding: 0 9px;
+  background: none;
+  border: none;
+}
+.hamburger span {
+  display: block;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ink);
+}
+.nav-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 30;
+}
+
 /* --- Kenar çubuğu --- */
 .sidebar {
   width: 208px;
@@ -252,6 +293,36 @@ pre.json {
   margin: 0;
 }
 .expander { cursor: pointer; }
+
+/* --- Mobil (çekmece menü) --- */
+@media (max-width: 760px) {
+  #root { display: block; }
+
+  .topbar { display: flex; }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100dvh;
+    width: min(260px, 80vw);
+    background: var(--page);
+    border-right: 1px solid var(--border);
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    z-index: 40;
+  }
+  .sidebar.open { transform: translateX(0); }
+
+  main { padding: 68px 14px 20px; }
+
+  .tiles { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+  .search { max-width: none; }
+
+  /* Geniş tablolar sayfayı değil kendi kartını kaydırır */
+  .table-card { overflow-x: auto; }
+  .table-card table { min-width: 640px; }
+}
 
 /* Ekran okuyucu için görünmez tablo (grafik verisinin tablo hâli) */
 .sr-only {
