@@ -1,7 +1,8 @@
 // Admin backend (hoopdrop-admin-backend, 8091) HTTP istemcisi ve tipler.
 // Dev'de Vite 5173'ten mutlak adrese gider; build admin backend'den sunulunca
-// aynı origin'e düşer.
-const API = import.meta.env.DEV ? "http://127.0.0.1:8091" : "";
+// aynı origin'e düşer. Ayrı container olarak deploy edilince VITE_API_URL
+// build-time env'i ile backend adresi override edilir (bkz. Dockerfile).
+const API = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? "http://127.0.0.1:8091" : "");
 
 export type Stats = {
   total_players: number;

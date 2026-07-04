@@ -1,0 +1,51 @@
+# main'e push → UI'ı GHCR'a build+push et, sunucuda pull+restart.
+# VITE_API_URL build sırasında gömülür (admin-backend'in public adresi).
+# Sunucu GHCR'a workflow'un geçici GITHUB_TOKEN'ı ile login olur.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:latest
+          build-args: |
+            VITE_API_URL=http://31.40.204.178:8091
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Sunucuda güncelle
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy_key -p "${{ secrets.SSH_PORT }}" \
+            -o StrictHostKeyChecking=accept-new \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "docker login ghcr.io -u '${{ github.actor }}' --password-stdin \
+             && cd /opt/hoopdrop \
+             && docker compose pull admin-ui \
+             && docker compose up -d admin-ui"
