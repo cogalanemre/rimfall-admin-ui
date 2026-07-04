@@ -45,7 +45,9 @@ jobs:
           echo "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy_key -p "${{ secrets.SSH_PORT }}" \
             -o StrictHostKeyChecking=accept-new \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "docker login ghcr.io -u '${{ github.actor }}' --password-stdin \
+            "export DOCKER_CONFIG=\$(mktemp -d) \
+             && docker login ghcr.io -u '${{ github.actor }}' --password-stdin \
              && cd /opt/hoopdrop \
              && docker compose pull admin-ui \
-             && docker compose up -d admin-ui"
+             && docker compose up -d admin-ui \
+             && rm -rf \$DOCKER_CONFIG"
