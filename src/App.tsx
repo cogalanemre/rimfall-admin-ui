@@ -2,6 +2,7 @@ import { useState } from "react";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Players from "./pages/Players";
+import Runs from "./pages/Runs";
 import BugReports from "./pages/BugReports";
 import Maps from "./pages/Maps";
 
@@ -40,6 +41,9 @@ export default function App() {
         <NavLink to="/oyuncular" onClick={close}>
           Oyuncular
         </NavLink>
+        <NavLink to="/oyunlar" onClick={close}>
+          Oyunlar
+        </NavLink>
         <NavLink to="/bug-raporlari" onClick={close}>
           Bug Raporları
         </NavLink>
@@ -52,6 +56,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/oyuncular" element={<Players />} />
+          <Route path="/oyunlar" element={<Runs />} />
           <Route path="/bug-raporlari" element={<BugReports />} />
           <Route path="/haritalar" element={<Maps />} />
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -127,6 +127,25 @@ main { flex: 1; padding: 24px 28px; min-width: 0; }
 }
 @keyframes pulse { 50% { opacity: 0.35; } }
 
+.hint {
+  color: var(--muted);
+  font-size: 12.5px;
+  margin: -6px 0 14px;
+}
+.hint strong { color: var(--ink-2); }
+
+.download {
+  color: var(--series-1);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+.download:hover { border-color: var(--series-1); }
+
 .error-banner {
   background: var(--surface);
   border: 1px solid var(--critical);

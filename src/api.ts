@@ -63,6 +63,19 @@ export type MapRow = {
   plays: number;
 };
 
+export type RunRow = {
+  id: number;
+  map_name: string;
+  map_kind: string;
+  score: number;
+  outcome: string;
+  started_at: string;
+  ended_at: string;
+  user_id: number;
+  user_email: string;
+  user_name: string;
+};
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(API + path);
   if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
@@ -74,6 +87,10 @@ export const fetchPlayers = (q: string) =>
   get<Player[]>("/api/players" + (q ? `?q=${encodeURIComponent(q)}` : ""));
 export const fetchBugReports = () => get<BugReport[]>("/api/bug-reports?limit=200");
 export const fetchMaps = () => get<MapRow[]>("/api/maps");
+export const fetchRuns = (q: string) =>
+  get<RunRow[]>("/api/runs?limit=200" + (q ? `&q=${encodeURIComponent(q)}` : ""));
+// İndirme fetch ile değil doğrudan <a href> ile yapılır (attachment olarak iner).
+export const runExportUrl = (id: number) => `${API}/api/runs/${id}/export`;
 
 export async function banPlayer(id: number, reason: string): Promise<void> {
   const res = await fetch(`${API}/api/players/${id}/ban`, {
