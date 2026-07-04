@@ -25,6 +25,7 @@ export default function BugReports() {
                 <th className="num">#</th>
                 <th>Tarih</th>
                 <th>Oyuncu</th>
+                <th>Oyun</th>
                 <th>Mesaj</th>
                 <th>Cihaz</th>
               </tr>
@@ -35,7 +36,7 @@ export default function BugReports() {
               ))}
               {data.length === 0 && (
                 <tr>
-                  <td colSpan={5}>Henüz bug raporu yok.</td>
+                  <td colSpan={6}>Henüz bug raporu yok.</td>
                 </tr>
               )}
             </tbody>
@@ -55,12 +56,13 @@ function Row({ r, open, toggle }: { r: BugReport; open: boolean; toggle: () => v
         <td className="num">{r.id}</td>
         <td>{fmtDate(r.created_at)}</td>
         <td>{r.user_email ? `${r.user_name} (${r.user_email})` : "Misafir"}</td>
+        <td className="num strong">{r.run_id > 0 ? `#${r.run_id}` : "—"}</td>
         <td className="strong">{r.message}</td>
         <td>{String(deviceLine)}</td>
       </tr>
       {open && (
         <tr>
-          <td colSpan={5}>
+          <td colSpan={6}>
             <div className="report-detail">
               <h4>Oturum</h4>
               <code>{r.session_id}</code>
