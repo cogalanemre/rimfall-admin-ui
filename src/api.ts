@@ -63,6 +63,20 @@ export type MapRow = {
   plays: number;
 };
 
+export type ClientLog = {
+  id: number;
+  session_id: string;
+  level: string;
+  message: string;
+  file: string;
+  line: number;
+  func_name: string;
+  context: Record<string, unknown> | null;
+  created_at: string;
+  user_email: string;
+  user_name: string;
+};
+
 export type RunRow = {
   id: number;
   map_name: string;
@@ -89,6 +103,12 @@ export const fetchBugReports = () => get<BugReport[]>("/api/bug-reports?limit=20
 export const fetchMaps = () => get<MapRow[]>("/api/maps");
 export const fetchRuns = (q: string) =>
   get<RunRow[]>("/api/runs?limit=200" + (q ? `&q=${encodeURIComponent(q)}` : ""));
+export const fetchLogs = (q: string, level: string) =>
+  get<ClientLog[]>(
+    "/api/logs?limit=200" +
+      (q ? `&q=${encodeURIComponent(q)}` : "") +
+      (level ? `&level=${encodeURIComponent(level)}` : "")
+  );
 // İndirme fetch ile değil doğrudan <a href> ile yapılır (attachment olarak iner).
 export const runExportUrl = (id: number) => `${API}/api/runs/${id}/export`;
 

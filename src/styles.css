@@ -264,6 +264,19 @@ button.primary { background: var(--series-1); border-color: transparent; }
 button.primary:hover { background: var(--series-1-hover); }
 button:disabled { opacity: 0.5; cursor: default; }
 
+.filters { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+select {
+  font: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--ink);
+  padding: 7px 11px;
+  outline: none;
+}
+select:focus { border-color: var(--series-1); }
+
 input[type="text"], input[type="search"], textarea {
   font: inherit;
   background: var(--surface);

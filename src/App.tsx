@@ -3,6 +3,7 @@ import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Players from "./pages/Players";
 import Runs from "./pages/Runs";
+import Logs from "./pages/Logs";
 import BugReports from "./pages/BugReports";
 import Maps from "./pages/Maps";
 
@@ -44,6 +45,9 @@ export default function App() {
         <NavLink to="/oyunlar" onClick={close}>
           Oyunlar
         </NavLink>
+        <NavLink to="/hatalar" onClick={close}>
+          Hatalar
+        </NavLink>
         <NavLink to="/bug-raporlari" onClick={close}>
           Bug Raporları
         </NavLink>
@@ -57,6 +61,7 @@ export default function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/oyuncular" element={<Players />} />
           <Route path="/oyunlar" element={<Runs />} />
+          <Route path="/hatalar" element={<Logs />} />
           <Route path="/bug-raporlari" element={<BugReports />} />
           <Route path="/haritalar" element={<Maps />} />
           <Route path="*" element={<Navigate to="/" replace />} />
