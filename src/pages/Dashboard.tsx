@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { fetchStats } from "../api";
 import { usePoll } from "../usePoll";
 
@@ -24,19 +25,21 @@ export default function Dashboard() {
       {data && (
         <>
           <div className="tiles">
-            <Tile label="Toplam oyuncu" value={data.total_players} />
+            <Tile label="Toplam oyuncu" value={data.total_players} to="/oyuncular" />
             <Tile
               label="Anlık aktif oyuncu"
               value={data.active_players}
               sub="son 75 saniyede sinyal gönderenler"
+              to="/oyuncular"
             />
-            <Tile label="Toplam harita" value={data.total_maps} />
-            <Tile label="Toplam oyun" value={data.total_runs} />
+            <Tile label="Toplam harita" value={data.total_maps} to="/haritalar" />
+            <Tile label="Toplam oyun" value={data.total_runs} to="/oyunlar" />
           </div>
           <div className="tiles">
-            <Tile small label="Bugünkü oyun" value={data.runs_today} />
-            <Tile small label="Bug raporu" value={data.total_bug_reports} />
-            <Tile small label="Banlı oyuncu" value={data.banned_players} />
+            <Tile small label="Bugünkü oyun" value={data.runs_today} to="/oyunlar" />
+            <Tile small label="Açık bug raporu" value={data.open_bug_reports} to="/bug-raporlari" />
+            <Tile small label="Açık hata" value={data.open_errors} to="/hatalar" />
+            <Tile small label="Banlı oyuncu" value={data.banned_players} to="/oyuncular" />
             <Tile small label="Kayıtlı oturum" value={data.total_sessions} />
           </div>
           <div className="card">
@@ -54,19 +57,29 @@ function Tile({
   value,
   sub,
   small,
+  to,
 }: {
   label: string;
   value: number;
   sub?: string;
   small?: boolean;
+  to?: string; // verilirse kart ilgili liste sayfasına link olur
 }) {
-  return (
-    <div className={small ? "tile small" : "tile"}>
+  const cls = small ? "tile small" : "tile";
+  const body = (
+    <>
       <div className="label">{label}</div>
       <div className="value">{value.toLocaleString("tr-TR")}</div>
       {sub && <div className="sub">{sub}</div>}
-    </div>
+    </>
   );
+  if (to)
+    return (
+      <Link to={to} className={cls}>
+        {body}
+      </Link>
+    );
+  return <div className={cls}>{body}</div>;
 }
 
 // --- 7 günlük sütun grafiği (tek seri; başlık seriyi adlandırır, lejant yok) ---

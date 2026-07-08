@@ -11,7 +11,8 @@ export type Stats = {
   total_maps: number;
   total_runs: number;
   runs_today: number;
-  total_bug_reports: number;
+  open_bug_reports: number; // çözülmemiş bug raporları
+  open_errors: number; // çözülmemiş hata logları (warning hariç)
   total_sessions: number;
   runs_per_day: { day: string; count: number }[];
   generated_at: string;
@@ -43,6 +44,9 @@ export type BugReport = {
   user_email: string;
   user_name: string;
   run_id: number;
+  client_version: string; // bug hangi oyun sürümünde yaşandı ('' = eski kayıt)
+  solved: boolean;
+  solved_note: string;
 };
 
 export type LogEntry = {
@@ -76,6 +80,9 @@ export type ClientLog = {
   created_at: string;
   user_email: string;
   user_name: string;
+  client_version: string;
+  solved: boolean;
+  solved_note: string;
 };
 
 export type RunRow = {
@@ -104,11 +111,12 @@ export const fetchBugReports = () => get<BugReport[]>("/api/bug-reports?limit=20
 export const fetchMaps = () => get<MapRow[]>("/api/maps");
 export const fetchRuns = (q: string) =>
   get<RunRow[]>("/api/runs?limit=200" + (q ? `&q=${encodeURIComponent(q)}` : ""));
-export const fetchLogs = (q: string, level: string) =>
+export const fetchLogs = (q: string, level: string, solved: string) =>
   get<ClientLog[]>(
     "/api/logs?limit=200" +
       (q ? `&q=${encodeURIComponent(q)}` : "") +
-      (level ? `&level=${encodeURIComponent(level)}` : "")
+      (level ? `&level=${encodeURIComponent(level)}` : "") +
+      (solved ? `&solved=${solved}` : "")
   );
 // İndirme fetch ile değil doğrudan <a href> ile yapılır (attachment olarak iner).
 export const runExportUrl = (id: number) => `${API}/api/runs/${id}/export`;

@@ -7,12 +7,24 @@ const REFRESH_MS = 15000;
 export default function BugReports() {
   const { data, error } = usePoll(fetchBugReports, REFRESH_MS);
   const [open, setOpen] = useState<number | null>(null);
+  const [durum, setDurum] = useState(""); // '' = tümü, 'acik', 'cozuldu'
+
+  const rows = (data ?? []).filter((r) =>
+    durum === "" ? true : durum === "acik" ? !r.solved : r.solved
+  );
 
   return (
     <>
       <div className="page-head">
         <h1>Bug Raporları</h1>
-        {data && <div className="live">{data.length} rapor</div>}
+        <div className="filters">
+          <select value={durum} onChange={(e) => setDurum(e.target.value)}>
+            <option value="">Tüm durumlar</option>
+            <option value="acik">Açık</option>
+            <option value="cozuldu">Çözüldü</option>
+          </select>
+          {data && <div className="live">{rows.length} rapor</div>}
+        </div>
       </div>
 
       {error && <div className="error-banner">Sunucuya ulaşılamadı: {error}</div>}
@@ -23,7 +35,9 @@ export default function BugReports() {
             <thead>
               <tr>
                 <th className="num">#</th>
+                <th>Durum</th>
                 <th>Tarih</th>
+                <th>Sürüm</th>
                 <th>Oyuncu</th>
                 <th>Oyun</th>
                 <th>Mesaj</th>
@@ -31,12 +45,12 @@ export default function BugReports() {
               </tr>
             </thead>
             <tbody>
-              {data.map((r) => (
+              {rows.map((r) => (
                 <Row key={r.id} r={r} open={open === r.id} toggle={() => setOpen(open === r.id ? null : r.id)} />
               ))}
-              {data.length === 0 && (
+              {rows.length === 0 && (
                 <tr>
-                  <td colSpan={6}>Henüz bug raporu yok.</td>
+                  <td colSpan={8}>{durum === "" ? "Henüz bug raporu yok." : "Bu durumda rapor yok."}</td>
                 </tr>
               )}
             </tbody>
@@ -54,7 +68,13 @@ function Row({ r, open, toggle }: { r: BugReport; open: boolean; toggle: () => v
     <>
       <tr className="expander" onClick={toggle}>
         <td className="num">{r.id}</td>
+        <td>
+          <span className={r.solved ? "badge solved" : "badge open"}>
+            {r.solved ? "çözüldü" : "açık"}
+          </span>
+        </td>
         <td>{fmtDate(r.created_at)}</td>
+        <td>{r.client_version || "—"}</td>
         <td>{r.user_email ? `${r.user_name} (${r.user_email})` : "Misafir"}</td>
         <td className="num strong">{r.run_id > 0 ? `#${r.run_id}` : "—"}</td>
         <td className="strong">{r.message}</td>
@@ -62,8 +82,14 @@ function Row({ r, open, toggle }: { r: BugReport; open: boolean; toggle: () => v
       </tr>
       {open && (
         <tr>
-          <td colSpan={6}>
+          <td colSpan={8}>
             <div className="report-detail">
+              {r.solved && r.solved_note && (
+                <>
+                  <h4>Çözüm notu</h4>
+                  <p>{r.solved_note}</p>
+                </>
+              )}
               <h4>Oturum</h4>
               <code>{r.session_id}</code>
               {r.context && (
