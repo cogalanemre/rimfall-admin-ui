@@ -30,7 +30,7 @@ jobs:
           push: true
           tags: ghcr.io/${{ github.repository }}:latest
           build-args: |
-            VITE_API_URL=http://31.40.204.178:8091
+            VITE_API_URL=http://31.40.204.178:8096
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -47,7 +47,7 @@ jobs:
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
             "export DOCKER_CONFIG=\$(mktemp -d) \
              && docker login ghcr.io -u '${{ github.actor }}' --password-stdin \
-             && cd /opt/hoopdrop \
+             && cd /opt/rimfall \
              && docker compose pull admin-ui \
              && docker compose up -d admin-ui \
              && rm -rf \$DOCKER_CONFIG"

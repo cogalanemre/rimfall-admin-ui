@@ -1,21 +1,21 @@
-# Hoop Drop Admin UI
+# Rimfall Admin UI
 
 React + TypeScript + Vite admin paneli. Backend'i:
-`/Users/emre.cogalan/hoopdrop/hoopdrop-admin-backend` (port 8091). UI metinleri Türkçe.
+`/Users/emre.cogalan/Rimfall/admin-backend` (port 8096). UI metinleri Türkçe.
 
 ## Çalıştırma
 
 ```bash
 npm run dev      # geliştirme: http://localhost:5173 (API'ye CORS ile gider)
-npm run build    # tsc + vite build → dist/ (admin backend dist'i 8091'den sunar)
+npm run build    # tsc + vite build → dist/ (admin backend dist'i 8096'den sunar)
 ```
 
 Node Homebrew'dan kurulu (`/opt/homebrew/bin/node`, v26). Build sonrası ayrı
-sunucuya gerek yok: http://127.0.0.1:8091 hem API hem UI.
+sunucuya gerek yok: http://127.0.0.1:8096 hem API hem UI.
 
 ## Yapı
 
-- `src/api.ts` — API istemcisi + tipler (dev'de 127.0.0.1:8091'e mutlak, build'de aynı origin)
+- `src/api.ts` — API istemcisi + tipler (dev'de 127.0.0.1:8096'e mutlak, build'de aynı origin)
 - `src/usePoll.ts` — aralıklı veri çekme kancası; eldeki görünüm yenilemede korunur
 - `src/pages/Dashboard.tsx` — stat kartları + 7 günlük sütun grafiği, **5 sn'de bir** poll
 - `src/pages/Players.tsx` — arama, ban (sebep modalı) / unban, çevrimiçi rozetleri, 10 sn poll
