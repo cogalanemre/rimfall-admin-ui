@@ -154,6 +154,24 @@ main { flex: 1; padding: 24px 28px; min-width: 0; }
   color: var(--ink-2);
   margin-bottom: 16px;
 }
+/* Sarı denge/dikkat uyarısı (ekonomi denge kuralı vb.) */
+.warn-banner {
+  background: var(--surface);
+  border: 1px solid var(--warning);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: var(--ink-2);
+  margin-bottom: 16px;
+}
+/* Başarılı işlem bildirimi */
+.ok-banner {
+  background: var(--surface);
+  border: 1px solid var(--good);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: var(--ink-2);
+  margin-bottom: 16px;
+}
 
 /* --- Stat kartları --- */
 .tiles {
@@ -335,6 +353,61 @@ pre.json {
   margin: 0;
 }
 .expander { cursor: pointer; }
+
+/* --- Ekonomi formu --- */
+.econ-section { margin-bottom: 16px; }
+.econ-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px 14px;
+}
+.econ-subgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px 10px;
+  background: var(--page);
+  border: 1px solid var(--grid);
+  border-radius: 8px;
+  padding: 10px;
+}
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field > span { color: var(--muted); font-size: 12px; font-weight: 550; }
+.field input[type="number"] { width: 100%; }
+.field-wide { grid-column: 1 / -1; }
+.field textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+input.invalid, textarea.invalid { border-color: var(--critical); }
+input[type="number"] {
+  font: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--ink);
+  padding: 7px 11px;
+  outline: none;
+}
+input[type="number"]:focus { border-color: var(--series-1); }
+
+/* --- Ekonomi geçmişi --- */
+.history-row { border-top: 1px solid var(--grid); padding: 10px 0; }
+.history-row:first-of-type { border-top: none; }
+.history-head { color: var(--ink-2); font-size: 13px; }
+.hint-inline { color: var(--muted); font-size: 12px; margin-left: 8px; }
+.diff-list { margin: 6px 0 0; padding-left: 18px; }
+.diff-list li { margin: 2px 0; }
+.diff-list code { font-size: 12px; color: var(--ink-2); }
+
+/* --- Cüzdan paneli --- */
+.wallet-adjust {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.wallet-adjust input[type="number"] { width: 140px; }
+.wallet-adjust input[type="text"] { max-width: 360px; }
+.delta-pos { color: var(--good); }
+.delta-neg { color: var(--critical); }
 
 /* --- Mobil (çekmece menü) --- */
 @media (max-width: 760px) {

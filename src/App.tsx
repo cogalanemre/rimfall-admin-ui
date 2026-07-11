@@ -6,6 +6,8 @@ import Runs from "./pages/Runs";
 import Logs from "./pages/Logs";
 import BugReports from "./pages/BugReports";
 import Maps from "./pages/Maps";
+import Weekly from "./pages/Weekly";
+import Economy from "./pages/Economy";
 
 export default function App() {
   // Dar ekranda kenar çubuğu çekmeceye dönüşür; hamburger açar/kapar.
@@ -54,6 +56,12 @@ export default function App() {
         <NavLink to="/haritalar" onClick={close}>
           Haritalar
         </NavLink>
+        <NavLink to="/haftalik" onClick={close}>
+          Haftalık
+        </NavLink>
+        <NavLink to="/ekonomi" onClick={close}>
+          Ekonomi
+        </NavLink>
       </nav>
 
       <main>
@@ -64,6 +72,8 @@ export default function App() {
           <Route path="/hatalar" element={<Logs />} />
           <Route path="/bug-raporlari" element={<BugReports />} />
           <Route path="/haritalar" element={<Maps />} />
+          <Route path="/haftalik" element={<Weekly />} />
+          <Route path="/ekonomi" element={<Economy />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

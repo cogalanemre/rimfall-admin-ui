@@ -1,5 +1,14 @@
-import { useCallback, useState } from "react";
-import { banPlayer, fetchPlayers, fmtDate, unbanPlayer, type Player } from "../api";
+import { useCallback, useEffect, useState } from "react";
+import {
+  adjustWallet,
+  banPlayer,
+  fetchPlayers,
+  fetchWallet,
+  fmtDate,
+  unbanPlayer,
+  type Player,
+  type WalletInfo,
+} from "../api";
 import { usePoll } from "../usePoll";
 
 // Oyuncu listesi 10 sn'de bir tazelenir (çevrimiçi durumu için yeterli).
@@ -12,6 +21,7 @@ export default function Players() {
   const [banTarget, setBanTarget] = useState<Player | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [open, setOpen] = useState<number | null>(null); // cüzdan detayı açık oyuncu
 
   const doBan = async (reason: string) => {
     if (!banTarget) return;
@@ -76,30 +86,15 @@ export default function Players() {
             </thead>
             <tbody>
               {data.map((p) => (
-                <tr key={p.id}>
-                  <td className="num">{p.id}</td>
-                  <td className="strong">{p.email}</td>
-                  <td>{p.name}</td>
-                  <td>{p.provider === "google" ? "Google" : "E-posta"}</td>
-                  <td>{fmtDate(p.created_at)}</td>
-                  <td className="num">{p.runs}</td>
-                  <td className="num">{p.best_score}</td>
-                  <td>{fmtDate(p.last_seen)}</td>
-                  <td>
-                    <StatusBadge p={p} />
-                  </td>
-                  <td>
-                    {p.banned_at ? (
-                      <button disabled={busy} onClick={() => doUnban(p)}>
-                        Banı kaldır
-                      </button>
-                    ) : (
-                      <button className="danger" disabled={busy} onClick={() => setBanTarget(p)}>
-                        Banla
-                      </button>
-                    )}
-                  </td>
-                </tr>
+                <PlayerRow
+                  key={p.id}
+                  p={p}
+                  open={open === p.id}
+                  toggle={() => setOpen(open === p.id ? null : p.id)}
+                  busy={busy}
+                  onBan={() => setBanTarget(p)}
+                  onUnban={() => doUnban(p)}
+                />
               ))}
               {data.length === 0 && (
                 <tr>
@@ -120,6 +115,181 @@ export default function Players() {
         />
       )}
     </>
+  );
+}
+
+// Satıra tıklayınca cüzdan detayı (bakiye + son 50 transaction + düzeltme) açılır.
+function PlayerRow({
+  p,
+  open,
+  toggle,
+  busy,
+  onBan,
+  onUnban,
+}: {
+  p: Player;
+  open: boolean;
+  toggle: () => void;
+  busy: boolean;
+  onBan: () => void;
+  onUnban: () => void;
+}) {
+  return (
+    <>
+      <tr className="expander" onClick={toggle}>
+        <td className="num">{p.id}</td>
+        <td className="strong">{p.email}</td>
+        <td>{p.name}</td>
+        <td>{p.provider === "google" ? "Google" : "E-posta"}</td>
+        <td>{fmtDate(p.created_at)}</td>
+        <td className="num">{p.runs}</td>
+        <td className="num">{p.best_score}</td>
+        <td>{fmtDate(p.last_seen)}</td>
+        <td>
+          <StatusBadge p={p} />
+        </td>
+        <td>
+          {p.banned_at ? (
+            <button
+              disabled={busy}
+              onClick={(e) => {
+                e.stopPropagation();
+                onUnban();
+              }}
+            >
+              Banı kaldır
+            </button>
+          ) : (
+            <button
+              className="danger"
+              disabled={busy}
+              onClick={(e) => {
+                e.stopPropagation();
+                onBan();
+              }}
+            >
+              Banla
+            </button>
+          )}
+        </td>
+      </tr>
+      {open && (
+        <tr>
+          <td colSpan={10}>
+            <WalletPanel playerId={p.id} />
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+// Cüzdan paneli: açılınca yüklenir; düzeltme sonrası yeniden çekilir.
+function WalletPanel({ playerId }: { playerId: number }) {
+  const [wallet, setWallet] = useState<WalletInfo | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [amount, setAmount] = useState("");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    fetchWallet(playerId)
+      .then((w) => {
+        setWallet(w);
+        setError(null);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+  }, [playerId]);
+  useEffect(load, [load]);
+
+  const amountNum = Number(amount);
+  const valid = amount.trim() !== "" && Number.isInteger(amountNum) && amountNum !== 0 && reason.trim() !== "";
+
+  const doAdjust = async () => {
+    if (!valid) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await adjustWallet(playerId, amountNum, reason.trim());
+      setMsg(`Düzeltme uygulandı; yeni bakiye ${res.balance} Pul.`);
+      setError(null);
+      setAmount("");
+      setReason("");
+      load();
+    } catch (e) {
+      // Sunucu reddi (ör. "bakiye negatife düşürülemez") aynen gösterilir.
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="report-detail">
+      {error && <div className="error-banner">Cüzdan: {error}</div>}
+      {msg && <div className="ok-banner">{msg}</div>}
+      {wallet && (
+        <>
+          <h4>Cüzdan</h4>
+          <p>
+            Bakiye: <strong>{wallet.balance} Pul</strong>
+          </p>
+
+          <h4>Elle düzeltme (miktar + sebep zorunlu; negatife düşürme yasak)</h4>
+          <div className="wallet-adjust" onClick={(e) => e.stopPropagation()}>
+            <input
+              type="number"
+              step="1"
+              placeholder="Miktar (+/-)"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+            <input
+              type="text"
+              placeholder="Sebep (transactions ref_id'sine yazılır)"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+            <button className="primary" disabled={busy || !valid} onClick={doAdjust}>
+              Uygula
+            </button>
+          </div>
+
+          <h4>Son {wallet.transactions.length} işlem</h4>
+          {wallet.transactions.length === 0 ? (
+            <p>Henüz Pul hareketi yok.</p>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th className="num">#</th>
+                  <th className="num">Δ Pul</th>
+                  <th>Sebep</th>
+                  <th>Referans</th>
+                  <th>Tarih</th>
+                </tr>
+              </thead>
+              <tbody>
+                {wallet.transactions.map((t) => (
+                  <tr key={t.id}>
+                    <td className="num">{t.id}</td>
+                    <td className={"num " + (t.delta < 0 ? "delta-neg" : "delta-pos")}>
+                      {t.delta > 0 ? `+${t.delta}` : t.delta}
+                    </td>
+                    <td>
+                      <span className="badge">{t.reason}</span>
+                    </td>
+                    <td>{t.ref_id || "—"}</td>
+                    <td>{fmtDate(t.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 
