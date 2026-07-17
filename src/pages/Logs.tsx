@@ -1,5 +1,6 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { fetchLogs, fmtDate, type ClientLog } from "../api";
+import { SoftDeleteModal, useSoftDelete } from "../SoftDelete";
 import { usePoll } from "../usePoll";
 
 // Hata logları 15 sn'de bir tazelenir.
@@ -17,15 +18,29 @@ export default function Logs() {
   const [q, setQ] = useState("");
   const [level, setLevel] = useState("");
   const [solved, setSolved] = useState(""); // '' = tümü, 'false' = açık, 'true' = çözüldü
-  const fetcher = useCallback(() => fetchLogs(q, level, solved), [q, level, solved]);
-  const { data, error } = usePoll(fetcher, REFRESH_MS);
+  const [deleted, setDeleted] = useState(""); // '' = kayıtlar, 'true' = silinenler
+  const fetcher = useCallback(
+    () => fetchLogs(q, level, solved, deleted),
+    [q, level, solved, deleted]
+  );
+  const { data, error, refetch } = usePoll(fetcher, REFRESH_MS);
+  // Görünüm değişince poll turunu bekleme (usePoll fetcher değişimini izlemez).
+  useEffect(() => {
+    refetch();
+  }, [deleted, refetch]);
+  const sil = useSoftDelete("logs", refetch);
   const [open, setOpen] = useState<number | null>(null);
+  const inDeleted = deleted === "true";
 
   return (
     <>
       <div className="page-head">
         <h1>Hatalar</h1>
         <div className="filters">
+          <select value={deleted} onChange={(e) => setDeleted(e.target.value)}>
+            <option value="">Kayıtlar</option>
+            <option value="true">Silinenler</option>
+          </select>
           <select value={solved} onChange={(e) => setSolved(e.target.value)}>
             <option value="">Tüm durumlar</option>
             <option value="false">Açık</option>
@@ -49,6 +64,8 @@ export default function Logs() {
       </div>
 
       {error && <div className="error-banner">Sunucuya ulaşılamadı: {error}</div>}
+      {sil.error && <div className="error-banner">İşlem başarısız: {sil.error}</div>}
+      {sil.msg && <div className="ok-banner">{sil.msg}</div>}
 
       {data && (
         <div className="table-card">
@@ -68,7 +85,7 @@ export default function Logs() {
             <tbody>
               {data.length === 0 && (
                 <tr>
-                  <td colSpan={8}>Kayıtlı hata yok. 🎉</td>
+                  <td colSpan={8}>{inDeleted ? "Silinmiş log yok." : "Kayıtlı hata yok. 🎉"}</td>
                 </tr>
               )}
               {data.map((l) => (
@@ -77,17 +94,44 @@ export default function Logs() {
                   l={l}
                   open={open === l.id}
                   toggle={() => setOpen(open === l.id ? null : l.id)}
+                  busy={sil.busy}
+                  onDelete={() => sil.setTarget({ id: l.id, label: `#${l.id} logu` })}
+                  onRestore={() => sil.doRestore(l.id, `#${l.id} logu`)}
                 />
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      {sil.target && (
+        <SoftDeleteModal
+          title="Hata logunu sil"
+          subject={sil.target.label}
+          busy={sil.busy}
+          onCancel={() => sil.setTarget(null)}
+          onConfirm={sil.doDelete}
+        />
+      )}
     </>
   );
 }
 
-function Row({ l, open, toggle }: { l: ClientLog; open: boolean; toggle: () => void }) {
+function Row({
+  l,
+  open,
+  toggle,
+  busy,
+  onDelete,
+  onRestore,
+}: {
+  l: ClientLog;
+  open: boolean;
+  toggle: () => void;
+  busy: boolean;
+  onDelete: () => void;
+  onRestore: () => void;
+}) {
   return (
     <>
       <tr className="expander" onClick={toggle}>
@@ -113,6 +157,15 @@ function Row({ l, open, toggle }: { l: ClientLog; open: boolean; toggle: () => v
         <tr>
           <td colSpan={8}>
             <div className="report-detail">
+              {l.deleted_at && (
+                <>
+                  <h4>Silinme</h4>
+                  <p>
+                    {fmtDate(l.deleted_at)}
+                    {l.delete_reason ? ` — ${l.delete_reason}` : ""}
+                  </p>
+                </>
+              )}
               {l.solved && l.solved_note && (
                 <>
                   <h4>Çözüm notu</h4>
@@ -129,6 +182,30 @@ function Row({ l, open, toggle }: { l: ClientLog; open: boolean; toggle: () => v
                   <pre className="json">{JSON.stringify(l.context, null, 2)}</pre>
                 </>
               )}
+              <div className="actions" style={{ justifyContent: "flex-start", marginTop: 8 }}>
+                {l.deleted_at ? (
+                  <button
+                    disabled={busy}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRestore();
+                    }}
+                  >
+                    Geri al
+                  </button>
+                ) : (
+                  <button
+                    className="danger"
+                    disabled={busy}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete();
+                    }}
+                  >
+                    Sil
+                  </button>
+                )}
+              </div>
             </div>
           </td>
         </tr>

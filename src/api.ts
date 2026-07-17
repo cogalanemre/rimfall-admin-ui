@@ -47,6 +47,8 @@ export type BugReport = {
   client_version: string; // bug hangi oyun sürümünde yaşandı ('' = eski kayıt)
   solved: boolean;
   solved_note: string;
+  deleted_at: string | null; // soft delete: null = silinmemiş
+  delete_reason: string;
 };
 
 export type LogEntry = {
@@ -73,6 +75,8 @@ export type MapRow = {
   pool: number; // biriken ödül havuzu (Pul)
   verified: boolean; // yapımcı doğrulama koşusu var mı
   verified_run_id: number; // 0 = yok
+  deleted_at: string | null; // soft delete: null = silinmemiş
+  delete_reason: string;
 };
 
 export type ClientLog = {
@@ -90,6 +94,8 @@ export type ClientLog = {
   client_version: string;
   solved: boolean;
   solved_note: string;
+  deleted_at: string | null; // soft delete: null = silinmemiş
+  delete_reason: string;
 };
 
 export type RunRow = {
@@ -103,6 +109,8 @@ export type RunRow = {
   user_id: number;
   user_email: string;
   user_name: string;
+  deleted_at: string | null; // soft delete: null = silinmemiş
+  delete_reason: string;
 };
 
 // --- Ekonomi config ---
@@ -195,22 +203,29 @@ async function send<T>(method: string, path: string, body?: unknown): Promise<T>
 export const fetchStats = () => get<Stats>("/api/stats");
 export const fetchPlayers = (q: string) =>
   get<Player[]>("/api/players" + (q ? `?q=${encodeURIComponent(q)}` : ""));
-export const fetchBugReports = () => get<BugReport[]>("/api/bug-reports?limit=200");
-export const fetchMaps = (q = "", published = "") => {
+export const fetchBugReports = (deleted = "") =>
+  get<BugReport[]>("/api/bug-reports?limit=200" + (deleted ? `&deleted=${deleted}` : ""));
+export const fetchMaps = (q = "", published = "", deleted = "") => {
   const p = new URLSearchParams();
   if (q) p.set("q", q);
   if (published) p.set("published", published);
+  if (deleted) p.set("deleted", deleted);
   const qs = p.toString();
   return get<MapRow[]>("/api/maps" + (qs ? `?${qs}` : ""));
 };
-export const fetchRuns = (q: string) =>
-  get<RunRow[]>("/api/runs?limit=200" + (q ? `&q=${encodeURIComponent(q)}` : ""));
-export const fetchLogs = (q: string, level: string, solved: string) =>
+export const fetchRuns = (q: string, deleted = "") =>
+  get<RunRow[]>(
+    "/api/runs?limit=200" +
+      (q ? `&q=${encodeURIComponent(q)}` : "") +
+      (deleted ? `&deleted=${deleted}` : "")
+  );
+export const fetchLogs = (q: string, level: string, solved: string, deleted = "") =>
   get<ClientLog[]>(
     "/api/logs?limit=200" +
       (q ? `&q=${encodeURIComponent(q)}` : "") +
       (level ? `&level=${encodeURIComponent(level)}` : "") +
-      (solved ? `&solved=${solved}` : "")
+      (solved ? `&solved=${solved}` : "") +
+      (deleted ? `&deleted=${deleted}` : "")
   );
 // İndirme fetch ile değil doğrudan <a href> ile yapılır (attachment olarak iner).
 export const runExportUrl = (id: number) => `${API}/api/runs/${id}/export`;
@@ -240,6 +255,14 @@ export const deleteMap = (id: number, reason: string) =>
   send<{ deleted: boolean; name: string }>("POST", `/api/maps/${id}/delete`, { reason });
 export const unpublishMap = (id: number) =>
   send<{ published: boolean; pool_cancelled: number }>("POST", `/api/maps/${id}/unpublish`);
+
+// --- Soft delete (koşu / hata logu / bug raporu; harita silme deleteMap'te) ---
+// Kayıt kalıcı silinmez: listeden gizlenir, Silinenler görünümünden geri alınır.
+export type DeletableKind = "runs" | "logs" | "bug-reports" | "maps";
+export const softDelete = (kind: DeletableKind, id: number, reason = "") =>
+  send<{ deleted: boolean }>("POST", `/api/${kind}/${id}/delete`, { reason });
+export const restoreRecord = (kind: DeletableKind, id: number) =>
+  send<{ deleted: boolean }>("POST", `/api/${kind}/${id}/restore`);
 
 // --- Haftalık modlar ---
 export const fetchWeeks = () => get<WeekRow[]>("/api/weekly/weeks");

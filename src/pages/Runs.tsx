@@ -1,5 +1,6 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { fetchRuns, fmtDate, runExportUrl, type RunRow } from "../api";
+import { SoftDeleteModal, useSoftDelete } from "../SoftDelete";
 import { usePoll } from "../usePoll";
 
 // Koşu listesi 10 sn'de bir tazelenir.
@@ -12,20 +13,33 @@ function durationSec(r: RunRow): number {
 
 export default function Runs() {
   const [q, setQ] = useState("");
-  const fetcher = useCallback(() => fetchRuns(q), [q]);
-  const { data, error } = usePoll(fetcher, REFRESH_MS);
+  const [deleted, setDeleted] = useState(""); // '' = kayıtlar, 'true' = silinenler
+  const fetcher = useCallback(() => fetchRuns(q, deleted), [q, deleted]);
+  const { data, error, refetch } = usePoll(fetcher, REFRESH_MS);
+  // Görünüm değişince poll turunu bekleme (usePoll fetcher değişimini izlemez).
+  useEffect(() => {
+    refetch();
+  }, [deleted, refetch]);
+  const sil = useSoftDelete("runs", refetch);
+  const inDeleted = deleted === "true";
 
   return (
     <>
       <div className="page-head">
         <h1>Oyunlar</h1>
-        <input
-          type="search"
-          className="search"
-          placeholder="Oyuncu, harita veya ID ara…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
+        <div className="filters">
+          <select value={deleted} onChange={(e) => setDeleted(e.target.value)}>
+            <option value="">Kayıtlar</option>
+            <option value="true">Silinenler</option>
+          </select>
+          <input
+            type="search"
+            className="search"
+            placeholder="Oyuncu, harita veya ID ara…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </div>
       </div>
 
       <p className="hint">
@@ -35,6 +49,8 @@ export default function Runs() {
       </p>
 
       {error && <div className="error-banner">Sunucuya ulaşılamadı: {error}</div>}
+      {sil.error && <div className="error-banner">İşlem başarısız: {sil.error}</div>}
+      {sil.msg && <div className="ok-banner">{sil.msg}</div>}
 
       {data && (
         <div className="table-card">
@@ -49,13 +65,16 @@ export default function Runs() {
                 <th>Sonuç</th>
                 <th className="num">Süre</th>
                 <th>Tarih</th>
+                {inDeleted && <th>Silinme</th>}
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {data.length === 0 && (
                 <tr>
-                  <td colSpan={9}>Koşu bulunamadı.</td>
+                  <td colSpan={inDeleted ? 10 : 9}>
+                    {inDeleted ? "Silinmiş koşu yok." : "Koşu bulunamadı."}
+                  </td>
                 </tr>
               )}
               {data.map((r) => (
@@ -77,16 +96,48 @@ export default function Runs() {
                   </td>
                   <td className="num">{durationSec(r)} sn</td>
                   <td>{fmtDate(r.started_at)}</td>
+                  {inDeleted && (
+                    <td>
+                      {fmtDate(r.deleted_at)}
+                      {r.delete_reason ? ` — ${r.delete_reason}` : ""}
+                    </td>
+                  )}
                   <td>
                     <a className="download" href={runExportUrl(r.id)} download>
                       İNDİR
-                    </a>
+                    </a>{" "}
+                    {inDeleted ? (
+                      <button
+                        disabled={sil.busy}
+                        onClick={() => sil.doRestore(r.id, `#${r.id} koşusu`)}
+                      >
+                        Geri al
+                      </button>
+                    ) : (
+                      <button
+                        className="danger"
+                        disabled={sil.busy}
+                        onClick={() => sil.setTarget({ id: r.id, label: `#${r.id} koşusu` })}
+                      >
+                        Sil
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+
+      {sil.target && (
+        <SoftDeleteModal
+          title="Koşuyu sil"
+          subject={sil.target.label}
+          busy={sil.busy}
+          onCancel={() => sil.setTarget(null)}
+          onConfirm={sil.doDelete}
+        />
       )}
     </>
   );

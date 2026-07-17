@@ -1,13 +1,22 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { fetchBugReports, fmtDate, type BugReport } from "../api";
+import { SoftDeleteModal, useSoftDelete } from "../SoftDelete";
 import { usePoll } from "../usePoll";
 
 const REFRESH_MS = 15000;
 
 export default function BugReports() {
-  const { data, error } = usePoll(fetchBugReports, REFRESH_MS);
+  const [deleted, setDeleted] = useState(""); // '' = kayıtlar, 'true' = silinenler
+  const fetcher = useCallback(() => fetchBugReports(deleted), [deleted]);
+  const { data, error, refetch } = usePoll(fetcher, REFRESH_MS);
+  // Görünüm değişince poll turunu bekleme (usePoll fetcher değişimini izlemez).
+  useEffect(() => {
+    refetch();
+  }, [deleted, refetch]);
+  const sil = useSoftDelete("bug-reports", refetch);
   const [open, setOpen] = useState<number | null>(null);
   const [durum, setDurum] = useState(""); // '' = tümü, 'acik', 'cozuldu'
+  const inDeleted = deleted === "true";
 
   const rows = (data ?? []).filter((r) =>
     durum === "" ? true : durum === "acik" ? !r.solved : r.solved
@@ -18,6 +27,10 @@ export default function BugReports() {
       <div className="page-head">
         <h1>Bug Raporları</h1>
         <div className="filters">
+          <select value={deleted} onChange={(e) => setDeleted(e.target.value)}>
+            <option value="">Kayıtlar</option>
+            <option value="true">Silinenler</option>
+          </select>
           <select value={durum} onChange={(e) => setDurum(e.target.value)}>
             <option value="">Tüm durumlar</option>
             <option value="acik">Açık</option>
@@ -28,6 +41,8 @@ export default function BugReports() {
       </div>
 
       {error && <div className="error-banner">Sunucuya ulaşılamadı: {error}</div>}
+      {sil.error && <div className="error-banner">İşlem başarısız: {sil.error}</div>}
+      {sil.msg && <div className="ok-banner">{sil.msg}</div>}
 
       {data && (
         <div className="table-card">
@@ -46,22 +61,60 @@ export default function BugReports() {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <Row key={r.id} r={r} open={open === r.id} toggle={() => setOpen(open === r.id ? null : r.id)} />
+                <Row
+                  key={r.id}
+                  r={r}
+                  open={open === r.id}
+                  toggle={() => setOpen(open === r.id ? null : r.id)}
+                  busy={sil.busy}
+                  onDelete={() => sil.setTarget({ id: r.id, label: `#${r.id} raporu` })}
+                  onRestore={() => sil.doRestore(r.id, `#${r.id} raporu`)}
+                />
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={8}>{durum === "" ? "Henüz bug raporu yok." : "Bu durumda rapor yok."}</td>
+                  <td colSpan={8}>
+                    {inDeleted
+                      ? "Silinmiş rapor yok."
+                      : durum === ""
+                        ? "Henüz bug raporu yok."
+                        : "Bu durumda rapor yok."}
+                  </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
       )}
+
+      {sil.target && (
+        <SoftDeleteModal
+          title="Bug raporunu sil"
+          subject={sil.target.label}
+          busy={sil.busy}
+          onCancel={() => sil.setTarget(null)}
+          onConfirm={sil.doDelete}
+        />
+      )}
     </>
   );
 }
 
-function Row({ r, open, toggle }: { r: BugReport; open: boolean; toggle: () => void }) {
+function Row({
+  r,
+  open,
+  toggle,
+  busy,
+  onDelete,
+  onRestore,
+}: {
+  r: BugReport;
+  open: boolean;
+  toggle: () => void;
+  busy: boolean;
+  onDelete: () => void;
+  onRestore: () => void;
+}) {
   const device = r.device ?? {};
   const deviceLine = [device["os"], device["model"]].filter(Boolean).join(" · ") || "—";
   return (
@@ -84,6 +137,15 @@ function Row({ r, open, toggle }: { r: BugReport; open: boolean; toggle: () => v
         <tr>
           <td colSpan={8}>
             <div className="report-detail">
+              {r.deleted_at && (
+                <>
+                  <h4>Silinme</h4>
+                  <p>
+                    {fmtDate(r.deleted_at)}
+                    {r.delete_reason ? ` — ${r.delete_reason}` : ""}
+                  </p>
+                </>
+              )}
               {r.solved && r.solved_note && (
                 <>
                   <h4>Çözüm notu</h4>
@@ -132,6 +194,30 @@ function Row({ r, open, toggle }: { r: BugReport; open: boolean; toggle: () => v
               ) : (
                 <p>Rapor öncesinde log kaydı yok.</p>
               )}
+              <div className="actions" style={{ justifyContent: "flex-start", marginTop: 8 }}>
+                {r.deleted_at ? (
+                  <button
+                    disabled={busy}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRestore();
+                    }}
+                  >
+                    Geri al
+                  </button>
+                ) : (
+                  <button
+                    className="danger"
+                    disabled={busy}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete();
+                    }}
+                  >
+                    Sil
+                  </button>
+                )}
+              </div>
             </div>
           </td>
         </tr>

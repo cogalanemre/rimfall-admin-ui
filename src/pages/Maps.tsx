@@ -1,18 +1,34 @@
-import { useCallback, useState } from "react";
-import { deleteMap, fetchMaps, fmtDate, runExportUrl, unpublishMap, type MapRow } from "../api";
+import { useCallback, useEffect, useState } from "react";
+import {
+  deleteMap,
+  fetchMaps,
+  fmtDate,
+  restoreRecord,
+  runExportUrl,
+  unpublishMap,
+  type MapRow,
+} from "../api";
 import { usePoll } from "../usePoll";
 
 const REFRESH_MS = 15000;
 
 // Harita yönetimi (07-TOPLULUK-HARITALAR "Admin tarafı"): ad/kod/yapımcı
-// araması, yayın filtresi, satır detayı (doğrulama koşusu, havuz) ve
-// SİL (sebep zorunlu → map_deletions) / YAYINDAN KALDIR (havuz iptali).
+// araması, yayın filtresi, satır detayı (doğrulama koşusu, havuz),
+// SİL (sebep zorunlu → map_deletions + soft delete) / YAYINDAN KALDIR
+// (havuz iptali) ve Silinenler görünümünde GERİ AL.
 export default function Maps() {
   const [q, setQ] = useState("");
   const [published, setPublished] = useState(""); // '' = tümü, 'true', 'false'
-  // Filtre istemci tarafında (BugReports deseni): poll turunu beklemeden anında daralır.
-  const fetcher = useCallback(() => fetchMaps(), []);
+  const [deleted, setDeleted] = useState(""); // '' = kayıtlar, 'true' = silinenler
+  // Arama/yayın filtresi istemci tarafında (BugReports deseni): poll turunu
+  // beklemeden anında daralır. Silinenler görünümü ise sunucudan gelir.
+  const fetcher = useCallback(() => fetchMaps("", "", deleted), [deleted]);
   const { data: all, error, refetch } = usePoll(fetcher, REFRESH_MS);
+  // Görünüm değişince poll turunu bekleme (usePoll fetcher değişimini izlemez).
+  useEffect(() => {
+    refetch();
+  }, [deleted, refetch]);
+  const inDeleted = deleted === "true";
   const needle = q.trim().toLowerCase();
   const data = all
     ? all.filter(
@@ -37,8 +53,25 @@ export default function Maps() {
     setBusy(true);
     try {
       const res = await deleteMap(deleteTarget.id, reason);
-      setActionMsg(`"${res.name}" silindi; sebep map_deletions'a kaydedildi.`);
+      setActionMsg(
+        `"${res.name}" silindi; sebep map_deletions'a kaydedildi. ` +
+          `Silinenler görünümünden geri alınabilir.`
+      );
       setDeleteTarget(null);
+      setActionError(null);
+      await refetch();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doRestore = async (m: MapRow) => {
+    setBusy(true);
+    try {
+      await restoreRecord("maps", m.id);
+      setActionMsg(`"${m.name}" geri alındı.`);
       setActionError(null);
       await refetch();
     } catch (e) {
@@ -72,6 +105,10 @@ export default function Maps() {
       <div className="page-head">
         <h1>Haritalar</h1>
         <div className="filters">
+          <select value={deleted} onChange={(e) => setDeleted(e.target.value)}>
+            <option value="">Kayıtlar</option>
+            <option value="true">Silinenler</option>
+          </select>
           <select value={published} onChange={(e) => setPublished(e.target.value)}>
             <option value="">Tümü</option>
             <option value="true">Yayında</option>
@@ -105,7 +142,7 @@ export default function Maps() {
                 <th className="num">Oynanma</th>
                 <th className="num">Bitirme</th>
                 <th className="num">Havuz</th>
-                <th>Oluşturulma</th>
+                <th>{inDeleted ? "Silinme" : "Oluşturulma"}</th>
               </tr>
             </thead>
             <tbody>
@@ -118,11 +155,12 @@ export default function Maps() {
                   busy={busy}
                   onDelete={() => setDeleteTarget(m)}
                   onUnpublish={() => setUnpubTarget(m)}
+                  onRestore={() => doRestore(m)}
                 />
               ))}
               {data.length === 0 && (
                 <tr>
-                  <td colSpan={9}>Eşleşen harita yok.</td>
+                  <td colSpan={9}>{inDeleted ? "Silinmiş harita yok." : "Eşleşen harita yok."}</td>
                 </tr>
               )}
             </tbody>
@@ -168,6 +206,7 @@ function Row({
   busy,
   onDelete,
   onUnpublish,
+  onRestore,
 }: {
   m: MapRow;
   open: boolean;
@@ -175,6 +214,7 @@ function Row({
   busy: boolean;
   onDelete: () => void;
   onUnpublish: () => void;
+  onRestore: () => void;
 }) {
   return (
     <>
@@ -193,7 +233,7 @@ function Row({
         <td className="num">{m.plays}</td>
         <td className="num">{m.finishes}</td>
         <td className="num">{m.pool}</td>
-        <td>{fmtDate(m.created_at)}</td>
+        <td>{m.deleted_at ? fmtDate(m.deleted_at) : fmtDate(m.created_at)}</td>
       </tr>
       {open && (
         <tr>
@@ -211,28 +251,51 @@ function Row({
                   <span className="badge open">yok — taslak/eski istemci kaydı</span>
                 )}
               </p>
+              {m.deleted_at && (
+                <>
+                  <h4>Silinme</h4>
+                  <p>
+                    {fmtDate(m.deleted_at)}
+                    {m.delete_reason ? ` — ${m.delete_reason}` : ""}
+                  </p>
+                </>
+              )}
               <div className="actions" style={{ justifyContent: "flex-start", marginTop: 8 }}>
-                {m.published && (
+                {m.deleted_at ? (
                   <button
                     disabled={busy}
                     onClick={(e) => {
                       e.stopPropagation();
-                      onUnpublish();
+                      onRestore();
                     }}
                   >
-                    Yayından kaldır
+                    Geri al
                   </button>
+                ) : (
+                  <>
+                    {m.published && (
+                      <button
+                        disabled={busy}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onUnpublish();
+                        }}
+                      >
+                        Yayından kaldır
+                      </button>
+                    )}
+                    <button
+                      className="danger"
+                      disabled={busy}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete();
+                      }}
+                    >
+                      Sil
+                    </button>
+                  </>
                 )}
-                <button
-                  className="danger"
-                  disabled={busy}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete();
-                  }}
-                >
-                  Sil
-                </button>
               </div>
             </div>
           </td>
@@ -260,9 +323,9 @@ function DeleteModal({
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h3>Haritayı sil</h3>
         <p>
-          <strong>{map.name}</strong> {map.code ? `(${map.code}) ` : ""}kalıcı olarak silinecek.
-          Sebep notu zorunludur; map_deletions denetim kaydına yazılır (yapımcıya girişte
-          gösterilecek).
+          <strong>{map.name}</strong> {map.code ? `(${map.code}) ` : ""}oyundan ve listelerden
+          kaldırılacak (Silinenler görünümünden geri alınabilir). Sebep notu zorunludur;
+          map_deletions denetim kaydına yazılır (yapımcıya girişte gösterilecek).
         </p>
         <input
           type="text"
