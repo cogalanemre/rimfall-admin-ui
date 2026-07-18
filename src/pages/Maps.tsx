@@ -1,21 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  deleteMap,
-  fetchMaps,
-  fmtDate,
-  restoreRecord,
-  runExportUrl,
-  unpublishMap,
-  type MapRow,
-} from "../api";
+import { fetchMaps, fmtDate, runExportUrl, unpublishMap, type MapRow } from "../api";
+import { SoftDeleteModal, useSoftDelete } from "../SoftDelete";
 import { usePoll } from "../usePoll";
 
 const REFRESH_MS = 15000;
 
 // Harita yönetimi (07-TOPLULUK-HARITALAR "Admin tarafı"): ad/kod/yapımcı
 // araması, yayın filtresi, satır detayı (doğrulama koşusu, havuz),
-// SİL (sebep zorunlu → map_deletions + soft delete) / YAYINDAN KALDIR
-// (havuz iptali) ve Silinenler görünümünde GERİ AL.
+// SİL / GERİ AL (ortak soft delete akışı; sunucu map_deletions denetim kaydı
+// yazar) ve YAYINDAN KALDIR (havuz iptali) modalı.
 export default function Maps() {
   const [q, setQ] = useState("");
   const [published, setPublished] = useState(""); // '' = tümü, 'true', 'false'
@@ -28,6 +21,7 @@ export default function Maps() {
   useEffect(() => {
     refetch();
   }, [deleted, refetch]);
+  const sil = useSoftDelete("maps", refetch);
   const inDeleted = deleted === "true";
   const needle = q.trim().toLowerCase();
   const data = all
@@ -42,44 +36,10 @@ export default function Maps() {
       )
     : null;
   const [open, setOpen] = useState<number | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<MapRow | null>(null);
   const [unpubTarget, setUnpubTarget] = useState<MapRow | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
-
-  const doDelete = async (reason: string) => {
-    if (!deleteTarget) return;
-    setBusy(true);
-    try {
-      const res = await deleteMap(deleteTarget.id, reason);
-      setActionMsg(
-        `"${res.name}" silindi; sebep map_deletions'a kaydedildi. ` +
-          `Silinenler görünümünden geri alınabilir.`
-      );
-      setDeleteTarget(null);
-      setActionError(null);
-      await refetch();
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const doRestore = async (m: MapRow) => {
-    setBusy(true);
-    try {
-      await restoreRecord("maps", m.id);
-      setActionMsg(`"${m.name}" geri alındı.`);
-      setActionError(null);
-      await refetch();
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const doUnpublish = async () => {
     if (!unpubTarget) return;
@@ -126,8 +86,10 @@ export default function Maps() {
       </div>
 
       {error && <div className="error-banner">Sunucuya ulaşılamadı: {error}</div>}
-      {actionError && <div className="error-banner">İşlem başarısız: {actionError}</div>}
-      {actionMsg && <div className="ok-banner">{actionMsg}</div>}
+      {(actionError || sil.error) && (
+        <div className="error-banner">İşlem başarısız: {actionError ?? sil.error}</div>
+      )}
+      {(actionMsg || sil.msg) && <div className="ok-banner">{actionMsg ?? sil.msg}</div>}
 
       {data && (
         <div className="table-card">
@@ -152,10 +114,10 @@ export default function Maps() {
                   m={m}
                   open={open === m.id}
                   toggle={() => setOpen(open === m.id ? null : m.id)}
-                  busy={busy}
-                  onDelete={() => setDeleteTarget(m)}
+                  busy={busy || sil.busy}
+                  onDelete={() => sil.setTarget({ id: m.id, label: `"${m.name}" haritası` })}
                   onUnpublish={() => setUnpubTarget(m)}
-                  onRestore={() => doRestore(m)}
+                  onRestore={() => sil.doRestore(m.id, `"${m.name}" haritası`)}
                 />
               ))}
               {data.length === 0 && (
@@ -168,12 +130,13 @@ export default function Maps() {
         </div>
       )}
 
-      {deleteTarget && (
-        <DeleteModal
-          map={deleteTarget}
-          busy={busy}
-          onCancel={() => setDeleteTarget(null)}
-          onConfirm={doDelete}
+      {sil.target && (
+        <SoftDeleteModal
+          title="Haritayı sil"
+          subject={sil.target.label}
+          busy={sil.busy}
+          onCancel={() => sil.setTarget(null)}
+          onConfirm={sil.doDelete}
         />
       )}
 
@@ -302,46 +265,5 @@ function Row({
         </tr>
       )}
     </>
-  );
-}
-
-function DeleteModal({
-  map,
-  busy,
-  onCancel,
-  onConfirm,
-}: {
-  map: MapRow;
-  busy: boolean;
-  onCancel: () => void;
-  onConfirm: (reason: string) => void;
-}) {
-  const [reason, setReason] = useState("");
-  const ok = reason.trim() !== "";
-  return (
-    <div className="modal-overlay" onClick={onCancel}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Haritayı sil</h3>
-        <p>
-          <strong>{map.name}</strong> {map.code ? `(${map.code}) ` : ""}oyundan ve listelerden
-          kaldırılacak (Silinenler görünümünden geri alınabilir). Sebep notu zorunludur;
-          map_deletions denetim kaydına yazılır (yapımcıya girişte gösterilecek).
-        </p>
-        <input
-          type="text"
-          placeholder="Silme sebebi (zorunlu)"
-          value={reason}
-          autoFocus
-          onChange={(e) => setReason(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && ok && onConfirm(reason.trim())}
-        />
-        <div className="actions">
-          <button onClick={onCancel}>Vazgeç</button>
-          <button className="danger" disabled={busy || !ok} onClick={() => onConfirm(reason.trim())}>
-            Sil
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }

@@ -1,7 +1,8 @@
-// Liste sayfalarında ortak soft delete akışı: SİL (opsiyonel sebep modalı) ve
-// Silinenler görünümünde GERİ AL. Kayıt kalıcı silinmez; sunucu deleted_at
-// doldurur, varsayılan listelerden gizler (uçlar: /api/{kind}/{id}/delete|restore).
-// Maps.tsx kullanmaz: harita silme sebebi zorunlu, kendi modalı var (deleteMap).
+// Liste sayfalarında ortak soft delete akışı: SİL (sebepsiz, tek tık onay
+// modalı) ve Silinenler görünümünde GERİ AL. Kayıt kalıcı silinmez; sunucu
+// deleted_at doldurur, varsayılan listelerden gizler
+// (uçlar: /api/{kind}/{id}/delete|restore). Dört sayfa da bunu kullanır;
+// haritada sunucu ayrıca map_deletions denetim kaydı yazar.
 import { useState } from "react";
 import { restoreRecord, softDelete, type DeletableKind } from "./api";
 
@@ -13,11 +14,11 @@ export function useSoftDelete(kind: DeletableKind, refetch: () => Promise<void>)
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
-  const doDelete = async (reason: string) => {
+  const doDelete = async () => {
     if (!target) return;
     setBusy(true);
     try {
-      await softDelete(kind, target.id, reason);
+      await softDelete(kind, target.id);
       setMsg(`${target.label} silindi; Silinenler görünümünden geri alınabilir.`);
       setError(null);
       setTarget(null);
@@ -57,9 +58,8 @@ export function SoftDeleteModal({
   subject: string;
   busy: boolean;
   onCancel: () => void;
-  onConfirm: (reason: string) => void;
+  onConfirm: () => void;
 }) {
-  const [reason, setReason] = useState("");
   return (
     <div className="modal-overlay" onClick={onCancel}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -68,17 +68,9 @@ export function SoftDeleteModal({
           <strong>{subject}</strong> listeden kaldırılacak. Kayıt kalıcı silinmez;
           Silinenler görünümünden geri alınabilir.
         </p>
-        <input
-          type="text"
-          placeholder="Silme sebebi (opsiyonel)"
-          value={reason}
-          autoFocus
-          onChange={(e) => setReason(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && !busy && onConfirm(reason.trim())}
-        />
         <div className="actions">
           <button onClick={onCancel}>Vazgeç</button>
-          <button className="danger" disabled={busy} onClick={() => onConfirm(reason.trim())}>
+          <button className="danger" disabled={busy} onClick={onConfirm}>
             Sil
           </button>
         </div>

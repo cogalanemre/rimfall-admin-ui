@@ -251,16 +251,15 @@ export const saveEconomyConfig = (config: Record<string, unknown>) =>
 export const fetchEconHistory = () => get<EconHistoryEntry[]>("/api/economy/history?limit=50");
 
 // --- Harita yönetimi ---
-export const deleteMap = (id: number, reason: string) =>
-  send<{ deleted: boolean; name: string }>("POST", `/api/maps/${id}/delete`, { reason });
 export const unpublishMap = (id: number) =>
   send<{ published: boolean; pool_cancelled: number }>("POST", `/api/maps/${id}/unpublish`);
 
-// --- Soft delete (koşu / hata logu / bug raporu; harita silme deleteMap'te) ---
+// --- Soft delete (koşu / hata logu / bug raporu / harita) ---
 // Kayıt kalıcı silinmez: listeden gizlenir, Silinenler görünümünden geri alınır.
+// Haritada sunucu ayrıca map_deletions denetim kaydı yazar.
 export type DeletableKind = "runs" | "logs" | "bug-reports" | "maps";
-export const softDelete = (kind: DeletableKind, id: number, reason = "") =>
-  send<{ deleted: boolean }>("POST", `/api/${kind}/${id}/delete`, { reason });
+export const softDelete = (kind: DeletableKind, id: number) =>
+  send<{ deleted: boolean }>("POST", `/api/${kind}/${id}/delete`);
 export const restoreRecord = (kind: DeletableKind, id: number) =>
   send<{ deleted: boolean }>("POST", `/api/${kind}/${id}/restore`);
 
