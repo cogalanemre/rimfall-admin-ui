@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { fetchBugReports, fmtDate, type BugReport } from "../api";
-import { SoftDeleteModal, useSoftDelete } from "../SoftDelete";
+import {
+  BulkActions,
+  SelectAllTh,
+  SelectTd,
+  SoftDeleteModal,
+  useSoftDelete,
+  type SoftDeleteState,
+} from "../SoftDelete";
 import { usePoll } from "../usePoll";
 
 const REFRESH_MS = 15000;
@@ -9,11 +16,14 @@ export default function BugReports() {
   const [deleted, setDeleted] = useState(""); // '' = kayıtlar, 'true' = silinenler
   const fetcher = useCallback(() => fetchBugReports(deleted), [deleted]);
   const { data, error, refetch } = usePoll(fetcher, REFRESH_MS);
-  // Görünüm değişince poll turunu bekleme (usePoll fetcher değişimini izlemez).
-  useEffect(() => {
-    refetch();
-  }, [deleted, refetch]);
   const sil = useSoftDelete("bug-reports", refetch);
+  // Görünüm değişince poll turunu bekleme (usePoll fetcher değişimini izlemez);
+  // önceki görünümün seçimi de anlamını yitirir.
+  const { clearSelection } = sil;
+  useEffect(() => {
+    clearSelection();
+    refetch();
+  }, [deleted, refetch, clearSelection]);
   const [open, setOpen] = useState<number | null>(null);
   const [durum, setDurum] = useState(""); // '' = tümü, 'acik', 'cozuldu'
   const inDeleted = deleted === "true";
@@ -21,12 +31,14 @@ export default function BugReports() {
   const rows = (data ?? []).filter((r) =>
     durum === "" ? true : durum === "acik" ? !r.solved : r.solved
   );
+  const visibleIds = rows.map((r) => r.id);
 
   return (
     <>
       <div className="page-head">
         <h1>Bug Raporları</h1>
         <div className="filters">
+          <BulkActions sil={sil} inDeleted={inDeleted} />
           <select value={deleted} onChange={(e) => setDeleted(e.target.value)}>
             <option value="">Kayıtlar</option>
             <option value="true">Silinenler</option>
@@ -49,6 +61,7 @@ export default function BugReports() {
           <table>
             <thead>
               <tr>
+                <SelectAllTh sil={sil} visibleIds={visibleIds} />
                 <th className="num">#</th>
                 <th>Durum</th>
                 <th>Tarih</th>
@@ -66,14 +79,12 @@ export default function BugReports() {
                   r={r}
                   open={open === r.id}
                   toggle={() => setOpen(open === r.id ? null : r.id)}
-                  busy={sil.busy}
-                  onDelete={() => sil.setTarget({ id: r.id, label: `#${r.id} raporu` })}
-                  onRestore={() => sil.doRestore(r.id, `#${r.id} raporu`)}
+                  sil={sil}
                 />
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={9}>
                     {inDeleted
                       ? "Silinmiş rapor yok."
                       : durum === ""
@@ -96,6 +107,15 @@ export default function BugReports() {
           onConfirm={sil.doDelete}
         />
       )}
+      {sil.batchOpen && (
+        <SoftDeleteModal
+          title="Seçilenleri sil"
+          subject={`${sil.selected.size} rapor`}
+          busy={sil.busy}
+          onCancel={() => sil.setBatchOpen(false)}
+          onConfirm={sil.doDeleteBatch}
+        />
+      )}
     </>
   );
 }
@@ -104,22 +124,19 @@ function Row({
   r,
   open,
   toggle,
-  busy,
-  onDelete,
-  onRestore,
+  sil,
 }: {
   r: BugReport;
   open: boolean;
   toggle: () => void;
-  busy: boolean;
-  onDelete: () => void;
-  onRestore: () => void;
+  sil: SoftDeleteState;
 }) {
   const device = r.device ?? {};
   const deviceLine = [device["os"], device["model"]].filter(Boolean).join(" · ") || "—";
   return (
     <>
       <tr className="expander" onClick={toggle}>
+        <SelectTd sil={sil} id={r.id} />
         <td className="num">{r.id}</td>
         <td>
           <span className={r.solved ? "badge solved" : "badge open"}>
@@ -135,7 +152,7 @@ function Row({
       </tr>
       {open && (
         <tr>
-          <td colSpan={8}>
+          <td colSpan={9}>
             <div className="report-detail">
               {r.deleted_at && (
                 <>
@@ -197,10 +214,10 @@ function Row({
               <div className="actions" style={{ justifyContent: "flex-start", marginTop: 8 }}>
                 {r.deleted_at ? (
                   <button
-                    disabled={busy}
+                    disabled={sil.busy}
                     onClick={(e) => {
                       e.stopPropagation();
-                      onRestore();
+                      sil.doRestore(r.id, `#${r.id} raporu`);
                     }}
                   >
                     Geri al
@@ -208,10 +225,10 @@ function Row({
                 ) : (
                   <button
                     className="danger"
-                    disabled={busy}
+                    disabled={sil.busy}
                     onClick={(e) => {
                       e.stopPropagation();
-                      onDelete();
+                      sil.setTarget({ id: r.id, label: `#${r.id} raporu` });
                     }}
                   >
                     Sil

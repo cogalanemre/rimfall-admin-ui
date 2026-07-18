@@ -18,11 +18,14 @@ sunucuya gerek yok: http://127.0.0.1:8096 hem API hem UI.
 - `src/api.ts` — API istemcisi + tipler (dev'de 127.0.0.1:8096'e mutlak, build'de aynı origin)
 - `src/usePoll.ts` — aralıklı veri çekme kancası; eldeki görünüm yenilemede korunur
 - `src/SoftDelete.tsx` — dört liste sayfasında ortak **soft delete** akışı:
-  `useSoftDelete` kancası + sebepsiz tek tık SİL onay modalı. Sayfalarda
-  "Kayıtlar / Silinenler" seçici var; Silinenler görünümü sunucudan
-  `?deleted=true` ile gelir (seçici değişince `useEffect` → `refetch`, poll
-  turu beklenmez), GERİ AL kaydı geri döndürür. Silme sebebi girilmez;
-  haritada denetim kaydını (map_deletions) sunucu sebepsiz yazar.
+  `useSoftDelete` kancası + sebepsiz tek tık SİL onay modalı + **satır seçimi**
+  (`SelectAllTh` başlıkta tümünü seç, `SelectTd` satır kutusu, `BulkActions`
+  filtre çubuğunda "Seçilenleri sil (N)" — Silinenler'de "Seçilenleri geri al";
+  toplu silme de onay modalından geçer, uçlar delete-batch/restore-batch).
+  Sayfalarda "Kayıtlar / Silinenler" seçici var; Silinenler görünümü sunucudan
+  `?deleted=true` ile gelir (seçici değişince `useEffect` → `refetch` + seçim
+  temizlenir, poll turu beklenmez), GERİ AL kaydı geri döndürür. Silme sebebi
+  girilmez; haritada denetim kaydını (map_deletions) sunucu sebepsiz yazar.
 - `src/pages/Dashboard.tsx` — stat kartları + 7 günlük sütun grafiği, **5 sn'de bir** poll
 - `src/pages/Players.tsx` — arama, ban (sebep modalı) / unban, çevrimiçi rozetleri, 10 sn poll;
   satıra tıklayınca **cüzdan paneli**: bakiye + son 50 transaction + elle düzeltme

@@ -250,6 +250,9 @@ tr:last-child td { border-bottom: none; }
 tbody tr:hover { background: var(--surface-2); }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 td.strong { color: var(--ink); font-weight: 550; }
+/* Satır seçimi (soft delete toplu işlemler) */
+td.check, th.check { width: 30px; padding-right: 0; text-align: center; }
+td.check input, th.check input { accent-color: var(--series-1); cursor: pointer; }
 
 /* --- Rozetler ve durum --- */
 .badge {

@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { fetchRuns, fmtDate, runExportUrl, type RunRow } from "../api";
-import { SoftDeleteModal, useSoftDelete } from "../SoftDelete";
+import {
+  BulkActions,
+  SelectAllTh,
+  SelectTd,
+  SoftDeleteModal,
+  useSoftDelete,
+} from "../SoftDelete";
 import { usePoll } from "../usePoll";
 
 // Koşu listesi 10 sn'de bir tazelenir.
@@ -16,18 +22,23 @@ export default function Runs() {
   const [deleted, setDeleted] = useState(""); // '' = kayıtlar, 'true' = silinenler
   const fetcher = useCallback(() => fetchRuns(q, deleted), [q, deleted]);
   const { data, error, refetch } = usePoll(fetcher, REFRESH_MS);
-  // Görünüm değişince poll turunu bekleme (usePoll fetcher değişimini izlemez).
-  useEffect(() => {
-    refetch();
-  }, [deleted, refetch]);
   const sil = useSoftDelete("runs", refetch);
+  // Görünüm değişince poll turunu bekleme (usePoll fetcher değişimini izlemez);
+  // önceki görünümün seçimi de anlamını yitirir.
+  const { clearSelection } = sil;
+  useEffect(() => {
+    clearSelection();
+    refetch();
+  }, [deleted, refetch, clearSelection]);
   const inDeleted = deleted === "true";
+  const visibleIds = (data ?? []).map((r) => r.id);
 
   return (
     <>
       <div className="page-head">
         <h1>Oyunlar</h1>
         <div className="filters">
+          <BulkActions sil={sil} inDeleted={inDeleted} />
           <select value={deleted} onChange={(e) => setDeleted(e.target.value)}>
             <option value="">Kayıtlar</option>
             <option value="true">Silinenler</option>
@@ -57,6 +68,7 @@ export default function Runs() {
           <table>
             <thead>
               <tr>
+                <SelectAllTh sil={sil} visibleIds={visibleIds} />
                 <th className="num">ID</th>
                 <th>Oyuncu</th>
                 <th>Harita</th>
@@ -72,13 +84,14 @@ export default function Runs() {
             <tbody>
               {data.length === 0 && (
                 <tr>
-                  <td colSpan={inDeleted ? 10 : 9}>
+                  <td colSpan={inDeleted ? 11 : 10}>
                     {inDeleted ? "Silinmiş koşu yok." : "Koşu bulunamadı."}
                   </td>
                 </tr>
               )}
               {data.map((r) => (
                 <tr key={r.id}>
+                  <SelectTd sil={sil} id={r.id} />
                   <td className="num strong">#{r.id}</td>
                   <td>{r.user_email ? `${r.user_name || "?"} (${r.user_email})` : "Misafir"}</td>
                   <td className="strong">{r.map_name}</td>
@@ -137,6 +150,15 @@ export default function Runs() {
           busy={sil.busy}
           onCancel={() => sil.setTarget(null)}
           onConfirm={sil.doDelete}
+        />
+      )}
+      {sil.batchOpen && (
+        <SoftDeleteModal
+          title="Seçilenleri sil"
+          subject={`${sil.selected.size} koşu`}
+          busy={sil.busy}
+          onCancel={() => sil.setBatchOpen(false)}
+          onConfirm={sil.doDeleteBatch}
         />
       )}
     </>

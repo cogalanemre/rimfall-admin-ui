@@ -262,6 +262,11 @@ export const softDelete = (kind: DeletableKind, id: number) =>
   send<{ deleted: boolean }>("POST", `/api/${kind}/${id}/delete`);
 export const restoreRecord = (kind: DeletableKind, id: number) =>
   send<{ deleted: boolean }>("POST", `/api/${kind}/${id}/restore`);
+// Toplu: seçili satırlar tek istekte; zaten işlenmişler atlanır, etkilenen sayı döner.
+export const softDeleteBatch = (kind: DeletableKind, ids: number[]) =>
+  send<{ affected: number }>("POST", `/api/${kind}/delete-batch`, { ids });
+export const restoreBatch = (kind: DeletableKind, ids: number[]) =>
+  send<{ affected: number }>("POST", `/api/${kind}/restore-batch`, { ids });
 
 // --- Haftalık modlar ---
 export const fetchWeeks = () => get<WeekRow[]>("/api/weekly/weeks");

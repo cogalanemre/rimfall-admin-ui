@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { fetchMaps, fmtDate, runExportUrl, unpublishMap, type MapRow } from "../api";
-import { SoftDeleteModal, useSoftDelete } from "../SoftDelete";
+import {
+  BulkActions,
+  SelectAllTh,
+  SelectTd,
+  SoftDeleteModal,
+  useSoftDelete,
+  type SoftDeleteState,
+} from "../SoftDelete";
 import { usePoll } from "../usePoll";
 
 const REFRESH_MS = 15000;
@@ -17,11 +24,14 @@ export default function Maps() {
   // beklemeden anında daralır. Silinenler görünümü ise sunucudan gelir.
   const fetcher = useCallback(() => fetchMaps("", "", deleted), [deleted]);
   const { data: all, error, refetch } = usePoll(fetcher, REFRESH_MS);
-  // Görünüm değişince poll turunu bekleme (usePoll fetcher değişimini izlemez).
-  useEffect(() => {
-    refetch();
-  }, [deleted, refetch]);
   const sil = useSoftDelete("maps", refetch);
+  // Görünüm değişince poll turunu bekleme (usePoll fetcher değişimini izlemez);
+  // önceki görünümün seçimi de anlamını yitirir.
+  const { clearSelection } = sil;
+  useEffect(() => {
+    clearSelection();
+    refetch();
+  }, [deleted, refetch, clearSelection]);
   const inDeleted = deleted === "true";
   const needle = q.trim().toLowerCase();
   const data = all
@@ -35,6 +45,7 @@ export default function Maps() {
             m.owner_name.toLowerCase().includes(needle))
       )
     : null;
+  const visibleIds = (data ?? []).map((m) => m.id);
   const [open, setOpen] = useState<number | null>(null);
   const [unpubTarget, setUnpubTarget] = useState<MapRow | null>(null);
   const [busy, setBusy] = useState(false);
@@ -65,6 +76,7 @@ export default function Maps() {
       <div className="page-head">
         <h1>Haritalar</h1>
         <div className="filters">
+          <BulkActions sil={sil} inDeleted={inDeleted} />
           <select value={deleted} onChange={(e) => setDeleted(e.target.value)}>
             <option value="">Kayıtlar</option>
             <option value="true">Silinenler</option>
@@ -96,6 +108,7 @@ export default function Maps() {
           <table>
             <thead>
               <tr>
+                <SelectAllTh sil={sil} visibleIds={visibleIds} />
                 <th className="num">#</th>
                 <th>Ad</th>
                 <th>Kod</th>
@@ -115,6 +128,7 @@ export default function Maps() {
                   open={open === m.id}
                   toggle={() => setOpen(open === m.id ? null : m.id)}
                   busy={busy || sil.busy}
+                  sil={sil}
                   onDelete={() => sil.setTarget({ id: m.id, label: `"${m.name}" haritası` })}
                   onUnpublish={() => setUnpubTarget(m)}
                   onRestore={() => sil.doRestore(m.id, `"${m.name}" haritası`)}
@@ -122,7 +136,7 @@ export default function Maps() {
               ))}
               {data.length === 0 && (
                 <tr>
-                  <td colSpan={9}>{inDeleted ? "Silinmiş harita yok." : "Eşleşen harita yok."}</td>
+                  <td colSpan={10}>{inDeleted ? "Silinmiş harita yok." : "Eşleşen harita yok."}</td>
                 </tr>
               )}
             </tbody>
@@ -137,6 +151,15 @@ export default function Maps() {
           busy={sil.busy}
           onCancel={() => sil.setTarget(null)}
           onConfirm={sil.doDelete}
+        />
+      )}
+      {sil.batchOpen && (
+        <SoftDeleteModal
+          title="Seçilenleri sil"
+          subject={`${sil.selected.size} harita`}
+          busy={sil.busy}
+          onCancel={() => sil.setBatchOpen(false)}
+          onConfirm={sil.doDeleteBatch}
         />
       )}
 
@@ -167,6 +190,7 @@ function Row({
   open,
   toggle,
   busy,
+  sil,
   onDelete,
   onUnpublish,
   onRestore,
@@ -175,6 +199,7 @@ function Row({
   open: boolean;
   toggle: () => void;
   busy: boolean;
+  sil: SoftDeleteState;
   onDelete: () => void;
   onUnpublish: () => void;
   onRestore: () => void;
@@ -182,6 +207,7 @@ function Row({
   return (
     <>
       <tr className="expander" onClick={toggle}>
+        <SelectTd sil={sil} id={m.id} />
         <td className="num">{m.id}</td>
         <td className="strong">{m.name}</td>
         <td>{m.code || "—"}</td>
@@ -200,7 +226,7 @@ function Row({
       </tr>
       {open && (
         <tr>
-          <td colSpan={9}>
+          <td colSpan={10}>
             <div className="report-detail">
               <h4>Detay</h4>
               <p>

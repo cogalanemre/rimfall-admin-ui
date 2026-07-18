@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { fetchLogs, fmtDate, type ClientLog } from "../api";
-import { SoftDeleteModal, useSoftDelete } from "../SoftDelete";
+import {
+  BulkActions,
+  SelectAllTh,
+  SelectTd,
+  SoftDeleteModal,
+  useSoftDelete,
+  type SoftDeleteState,
+} from "../SoftDelete";
 import { usePoll } from "../usePoll";
 
 // Hata logları 15 sn'de bir tazelenir.
@@ -24,19 +31,24 @@ export default function Logs() {
     [q, level, solved, deleted]
   );
   const { data, error, refetch } = usePoll(fetcher, REFRESH_MS);
-  // Görünüm değişince poll turunu bekleme (usePoll fetcher değişimini izlemez).
-  useEffect(() => {
-    refetch();
-  }, [deleted, refetch]);
   const sil = useSoftDelete("logs", refetch);
+  // Görünüm değişince poll turunu bekleme (usePoll fetcher değişimini izlemez);
+  // önceki görünümün seçimi de anlamını yitirir.
+  const { clearSelection } = sil;
+  useEffect(() => {
+    clearSelection();
+    refetch();
+  }, [deleted, refetch, clearSelection]);
   const [open, setOpen] = useState<number | null>(null);
   const inDeleted = deleted === "true";
+  const visibleIds = (data ?? []).map((l) => l.id);
 
   return (
     <>
       <div className="page-head">
         <h1>Hatalar</h1>
         <div className="filters">
+          <BulkActions sil={sil} inDeleted={inDeleted} />
           <select value={deleted} onChange={(e) => setDeleted(e.target.value)}>
             <option value="">Kayıtlar</option>
             <option value="true">Silinenler</option>
@@ -72,6 +84,7 @@ export default function Logs() {
           <table>
             <thead>
               <tr>
+                <SelectAllTh sil={sil} visibleIds={visibleIds} />
                 <th className="num">#</th>
                 <th>Durum</th>
                 <th>Seviye</th>
@@ -85,7 +98,7 @@ export default function Logs() {
             <tbody>
               {data.length === 0 && (
                 <tr>
-                  <td colSpan={8}>{inDeleted ? "Silinmiş log yok." : "Kayıtlı hata yok. 🎉"}</td>
+                  <td colSpan={9}>{inDeleted ? "Silinmiş log yok." : "Kayıtlı hata yok. 🎉"}</td>
                 </tr>
               )}
               {data.map((l) => (
@@ -94,9 +107,7 @@ export default function Logs() {
                   l={l}
                   open={open === l.id}
                   toggle={() => setOpen(open === l.id ? null : l.id)}
-                  busy={sil.busy}
-                  onDelete={() => sil.setTarget({ id: l.id, label: `#${l.id} logu` })}
-                  onRestore={() => sil.doRestore(l.id, `#${l.id} logu`)}
+                  sil={sil}
                 />
               ))}
             </tbody>
@@ -113,6 +124,15 @@ export default function Logs() {
           onConfirm={sil.doDelete}
         />
       )}
+      {sil.batchOpen && (
+        <SoftDeleteModal
+          title="Seçilenleri sil"
+          subject={`${sil.selected.size} log`}
+          busy={sil.busy}
+          onCancel={() => sil.setBatchOpen(false)}
+          onConfirm={sil.doDeleteBatch}
+        />
+      )}
     </>
   );
 }
@@ -121,20 +141,17 @@ function Row({
   l,
   open,
   toggle,
-  busy,
-  onDelete,
-  onRestore,
+  sil,
 }: {
   l: ClientLog;
   open: boolean;
   toggle: () => void;
-  busy: boolean;
-  onDelete: () => void;
-  onRestore: () => void;
+  sil: SoftDeleteState;
 }) {
   return (
     <>
       <tr className="expander" onClick={toggle}>
+        <SelectTd sil={sil} id={l.id} />
         <td className="num">{l.id}</td>
         <td>
           <span className={l.solved ? "badge solved" : "badge open"}>
@@ -155,7 +172,7 @@ function Row({
       </tr>
       {open && (
         <tr>
-          <td colSpan={8}>
+          <td colSpan={9}>
             <div className="report-detail">
               {l.deleted_at && (
                 <>
@@ -185,10 +202,10 @@ function Row({
               <div className="actions" style={{ justifyContent: "flex-start", marginTop: 8 }}>
                 {l.deleted_at ? (
                   <button
-                    disabled={busy}
+                    disabled={sil.busy}
                     onClick={(e) => {
                       e.stopPropagation();
-                      onRestore();
+                      sil.doRestore(l.id, `#${l.id} logu`);
                     }}
                   >
                     Geri al
@@ -196,10 +213,10 @@ function Row({
                 ) : (
                   <button
                     className="danger"
-                    disabled={busy}
+                    disabled={sil.busy}
                     onClick={(e) => {
                       e.stopPropagation();
-                      onDelete();
+                      sil.setTarget({ id: l.id, label: `#${l.id} logu` });
                     }}
                   >
                     Sil
